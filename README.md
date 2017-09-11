@@ -10,10 +10,10 @@
     // Interface address (replacing the requested request)
     final static String requestApiUrl = "http://cc.knoocrc.cn/cc-api/v1/session/list";
 
-    private static char md5Chars[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+    final static char md5Chars[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
     @Test
-    public void testIdkeyCreate() throws Exception {
+    public void testApiRequest() throws Exception {
         Map<String, Object> paramMap = new HashMap<String, Object>();
 
         //Gets the parameters that initiate the request
@@ -29,12 +29,12 @@
         paramMap.put("sign", sign);
         Connection connection = getConnection(requestApiUrl, Connection.Method.POST, paramMap);
         String data = connection.execute().body();
-        if(data == null) {
+        if (data == null) {
             Assert.fail();
         }
-        JSONObject value= (JSONObject)JSONObject.parse(data);
+        JSONObject value = (JSONObject) JSONObject.parse(data);
         String responseOk = value.get("isSuccess").toString();
-        if(responseOk == null || "false".equals(value.get("isSuccess").toString())) {
+        if (responseOk == null || "false".equals(value.get("isSuccess").toString())) {
             Assert.fail();
         }
         log.info(data);
@@ -47,7 +47,7 @@
 
         // Rank all other parameters in key ascending order
         java.util.Arrays.sort(array);
-        String keyStr = null;
+        String keyStr = "";
         for (int i = 0; i < array.length; i++) {
             // Splicing key and corresponding value into a string
             String key = array[i].toString();
@@ -58,7 +58,7 @@
         keyStr += secretKey;
 
         // The hexadecimal string of md5 values is the value of sign
-        return AccessFilter.MD5.md5(keyStr);
+        return md5(keyStr);
     }
 
     public static Connection getConnection(String url, Connection.Method method, Map<String, Object> paramMap) {
