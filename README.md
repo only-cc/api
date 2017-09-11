@@ -1,57 +1,64 @@
 
-    //用户创建学校或机构,返回机构或学校ID
+    public static final Logger log = LoggerFactory.getLogger(ApiTest.class);
+
+    // Users create schools or institutions, return to an organization or school ID (replace their own)
     final static int orgId = 30001;
 
-    // 用户创建学校或机构返回的APIKEY
+    // APIKEY returned by a user creating a school or organization
     final static String secretKey = "6a3747a06dc211e7a8c4816a023b4ce6";
 
+    // Interface address (replacing the requested request)
     final static String requestApiUrl = "http://cc.knoocrc.cn/cc-api/v1/session/list";
 
-### Splicing parameters, examples
+    private static char md5Chars[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
-    private static StringBuffer getParamStr(Map<String, Object> params) {
-        if (params == null) {
-            return null;
+    @Test
+    public void testIdkeyCreate() throws Exception {
+        Map<String, Object> paramMap = new HashMap<String, Object>();
+
+        //Gets the parameters that initiate the request
+        paramMap.put("orgId", orgId);
+        long timestamp = new Date().getTime();
+        paramMap.put("timestamp", timestamp);
+
+        // To generate the signature
+        String sign = generateSign(paramMap);
+        if (sign == null) {
+            Assert.fail();
         }
-        StringBuffer paramStr = new StringBuffer();
-        Iterator<String> iterator = params.keySet().iterator();
-        while (iterator.hasNext()) {
-            String name = iterator.next();
-            paramStr.append(name);
-            Object value = params.get(name);
-            if (value.getClass().isArray()) {
-                Object[] objects = (Object[]) value;
-                for (Object object : objects) {
-                    paramStr.append(object.toString());
-                }
-            } else {
-                paramStr.append(value);
-            }
+        paramMap.put("sign", sign);
+        Connection connection = getConnection(requestApiUrl, Connection.Method.POST, paramMap);
+        String data = connection.execute().body();
+        if(data == null) {
+            Assert.fail();
         }
-        return paramStr;
+        JSONObject value= (JSONObject)JSONObject.parse(data);
+        String responseOk = value.get("isSuccess").toString();
+        if(responseOk == null || "false".equals(value.get("isSuccess").toString())) {
+            Assert.fail();
+        }
+        log.info(data);
     }
 
 ### This is a fetching request parameter, then the key value is spelled into a string, and the above string is 16 bits of MD5HEX, for example
 
-    public static String md5Signature(Map<String, Object> paramMap, String secretKey) {
-        String result = null;
-        StringBuffer originalStr = new StringBuffer();
-        originalStr.append(getParamStr(paramMap)).append(secretKey);
-        if (originalStr == null) {
-            return result;
+    private String generateSign(Map<String, Object> params) throws Exception {
+        Object[] array = params.keySet().toArray();
+
+        // Rank all other parameters in key ascending order
+        java.util.Arrays.sort(array);
+        String keyStr = null;
+        for (int i = 0; i < array.length; i++) {
+            // Splicing key and corresponding value into a string
+            String key = array[i].toString();
+            keyStr += key + params.get(key);
         }
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] bArr = originalStr.toString().getBytes("UTF-8");
-            byte[] md5Value = md.digest(bArr);
-            BigInteger bigInt = new BigInteger(1, md5Value);
-            result = bigInt.toString(16);
-            while (result.length() < 32)
-                result = "0" + result;
-        } catch (Exception e) {
-            throw new RuntimeException("sign error !");
-        }
-        return result;
+
+        // Splicing the allocated secretkey in the back of the string obtained by the request parameter
+        keyStr += secretKey;
+
+        // The hexadecimal string of md5 values is the value of sign
+        return AccessFilter.MD5.md5(keyStr);
     }
 
     public static Connection getConnection(String url, Connection.Method method, Map<String, Object> paramMap) {
@@ -65,14 +72,30 @@
         return connection;
     }
 
-    public static void main(String[] args) throws Exception {
-        long timestamp = new Date().getTime();
-        TreeMap<String, Object> apiMap = new TreeMap<String, Object>();
-        apiMap.put("orgId", orgId);
-        apiMap.put("timestamp", timestamp);
-        String sign = Test.md5Signature(apiMap, secretKey);
-        apiMap.put("sign", sign);
-        Connection connection = getConnection(requestApiUrl, Connection.Method.POST, apiMap);
-        String data = connection.execute().body();
-        System.out.print(data);
+    public static String md5(String str) throws Exception {
+        MessageDigest md5 = getMD5Instance();
+        md5.update(str.getBytes("UTF-8"));
+        byte[] digest = md5.digest();
+        char[] chars = toHexChars(digest);
+        return new String(chars);
+    }
+
+    private static MessageDigest getMD5Instance() {
+        try {
+            return MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException ignored) {
+            throw new RuntimeException(ignored);
+        }
+    }
+
+    private static char[] toHexChars(byte[] digest) {
+        char[] chars = new char[digest.length * 2];
+        int i = 0;
+        for (byte b : digest) {
+            char c0 = md5Chars[(b & 0xf0) >> 4];
+            chars[i++] = c0;
+            char c1 = md5Chars[b & 0xf];
+            chars[i++] = c1;
+        }
+        return chars;
     }
